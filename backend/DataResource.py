@@ -159,7 +159,7 @@ class SecretaryData(object):
 
 
 class HolderNumData(object):
-    entity = namedtuple("HolderNum", ["code", "publish_date", "num"])
+    entity = namedtuple("HolderNum", ["code", "publish_date", "num", "value"])
     headers = {
         "User-Agent": "Mozilla/4.0 (compatible; MSIE7.0; WindowsNT5.1; Maxthon2.0)"
     }
@@ -192,13 +192,30 @@ class HolderNumData(object):
                 traceback.print_exc()
         return data
 
+    @staticmethod
+    def _parse_num(num: str) -> float:
+        _num = num.replace(",", "")
+        _v = -1
+        if _num.endswith("万"):
+            _num = _num.replace("万", "")
+            try:
+                _v = float(_num) * 10000
+            except ValueError:
+                pass
+        else:
+            try:
+                _v = float(_num)
+            except ValueError:
+                pass
+        return _v
+
     def _get_by_code(self, code: str) -> list:
         if self.n >= 2:
             self.stop()
             self.start()
         self.n += 1
-        code = "sh" + code if code.startswith("600") else "sz" + code
-        url = f"http://f10.eastmoney.com/f10_v2/ShareholderResearch.aspx?code={code}"
+        new_code = "sh" + code if code.startswith("600") else "sz" + code
+        url = f"http://f10.eastmoney.com/f10_v2/ShareholderResearch.aspx?code={new_code}"
         self.browser.get(url)
         key_list = []
         value_list = []
@@ -214,7 +231,8 @@ class HolderNumData(object):
         if len(key_list) == len(value_list):
             result = [self.entity(code=code,
                                   publish_date=k,
-                                  num=v)
+                                  num=v,
+                                  value=self._parse_num(v))
                       for k, v in zip(key_list, value_list)]
         return result
 

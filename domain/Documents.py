@@ -113,6 +113,7 @@ class HolderNumDocument(Document):
     code = StringField(max_length=20, required=True)
     publish_date = StringField(max_length=20, required=False)
     num = StringField(max_length=20, required=True)
+    value = FloatField(required=False)
 
 
 if __name__ == '__main__':
