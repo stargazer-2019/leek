@@ -7,10 +7,11 @@ from domain.Documents import HolderNumDocument, ShareDocument
 
 
 def flush_holder_num_task():
+    job = HolderNumData()
     connect('jiucai', host='master:17585')
     bar = tqdm([obj.code for obj in ShareDocument.objects().all()])
     for code in bar:
-        data = HolderNumData().get_by_code(code)
+        data = job.get_by_code(code)
         # noinspection PyProtectedMember
         bulk = [UpdateOne(
             {

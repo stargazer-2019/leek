@@ -9,6 +9,7 @@ import requests
 import baostock as bs
 import pandas as pd
 from bs4 import BeautifulSoup
+from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.phantomjs.webdriver import WebDriver
 from selenium.webdriver.phantomjs import webdriver
 
@@ -164,6 +165,7 @@ class HolderNumData(object):
     }
     browser: WebDriver = None
     n = 0
+    retry_num = 3
 
     def __init__(self):
         self.start()
@@ -175,14 +177,26 @@ class HolderNumData(object):
         if self.browser is not None:
             self.browser.close()
             self.browser.quit()
+        self.n = 0
 
     def __del__(self):
         self.stop()
 
-    def get_by_code(self, code: str):
-        if self.n >= 10:
+    def get_by_code(self, code: str) -> list:
+        data = []
+        for i in range(self.retry_num):
+            try:
+                data = self._get_by_code(code)
+                break
+            except WebDriverException:
+                traceback.print_exc()
+        return data
+
+    def _get_by_code(self, code: str) -> list:
+        if self.n >= 2:
             self.stop()
             self.start()
+        self.n += 1
         code = "sh" + code if code.startswith("600") else "sz" + code
         url = f"http://f10.eastmoney.com/f10_v2/ShareholderResearch.aspx?code={code}"
         self.browser.get(url)
@@ -207,4 +221,3 @@ class HolderNumData(object):
 
 if __name__ == '__main__':
     print(HolderNumData().get_by_code("600690"))
-
