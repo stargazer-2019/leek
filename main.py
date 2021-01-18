@@ -26,6 +26,6 @@ if __name__ == '__main__':
     if args.date:
         start = end = args.date
     if op == "holder_num":
-        FlushDataTask.flush_holder_num_task()
+        FlushDataTask.flush_holder_num_task(end)
     else:
         print("args wrong.")
