@@ -214,7 +214,7 @@ class HolderNumData(object):
             self.stop()
             self.start()
         self.n += 1
-        new_code = "sh" + code if code.startswith("600") else "sz" + code
+        new_code = "sh" + code if code.startswith("60") else "sz" + code
         url = f"http://f10.eastmoney.com/f10_v2/ShareholderResearch.aspx?code={new_code}"
         self.browser.get(url)
         key_list = []
@@ -238,4 +238,4 @@ class HolderNumData(object):
 
 
 if __name__ == '__main__':
-    print(HolderNumData().get_by_code("600690"))
+    print(HolderNumData().get_by_code("603017"))
