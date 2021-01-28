@@ -22,6 +22,7 @@ class AdjDocument(Document):
     code = StringField(max_length=10, required=True)
     trade_date = StringField(max_length=20, required=True)
     adj_score = FloatField(required=True)
+    create_time = StringField(required=True, default=datetime.datetime.now().strftime("%Y-%m-%d %X"))
 
 
 class MarketDocument(Document):
@@ -36,6 +37,7 @@ class MarketDocument(Document):
     psTTM = FloatField(required=True)
     pcfNcfTTM = FloatField(required=True)
     turn = FloatField(required=True)
+    create_time = StringField(required=True, default=datetime.datetime.now().strftime("%Y-%m-%d %X"))
 
 
 class FinanceDocument(Document):
@@ -82,6 +84,7 @@ class FinanceDocument(Document):
     dupontTaxBurden = StringField(max_length=20, required=False)
     dupontIntburden = StringField(max_length=20, required=False)
     dupontEbittogr = StringField(max_length=20, required=False)
+    create_time = StringField(required=True, default=datetime.datetime.now().strftime("%Y-%m-%d %X"))
 
 
 class SecretaryDocument(Document):
@@ -97,6 +100,7 @@ class SecretaryDocument(Document):
     stockName = StringField(max_length=20, required=False)
     crawlFromURL = StringField(max_length=200, required=True)
     source = StringField(max_length=20, required=False)
+    create_time = StringField(required=True, default=datetime.datetime.now().strftime("%Y-%m-%d %X"))
 
 
 class PbcDocument(Document):
@@ -107,6 +111,7 @@ class PbcDocument(Document):
     rate = StringField(required=True)
     url = StringField(max_length=300, required=True)
     content = StringField(max_length=10000, required=True)
+    create_time = StringField(required=True, default=datetime.datetime.now().strftime("%Y-%m-%d %X"))
 
 
 class HolderNumDocument(Document):
@@ -114,6 +119,7 @@ class HolderNumDocument(Document):
     publish_date = StringField(max_length=20, required=False)
     num = StringField(max_length=20, required=True)
     value = FloatField(required=False)
+    create_time = StringField(required=True, default=datetime.datetime.now().strftime("%Y-%m-%d %X"))
 
 
 if __name__ == '__main__':

@@ -3,6 +3,7 @@ import json
 import re
 import traceback
 from collections import namedtuple
+from typing import List
 
 import requests
 
@@ -13,20 +14,41 @@ from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.phantomjs.webdriver import WebDriver
 from selenium.webdriver.phantomjs import webdriver
 
+# 使用代理
+proxies = {
+    'http': '117.41.185.203:20042',
+    'https': '117.41.185.203:20042'
+}
+
 
 class AdjData(object):
+    """
+    获取复权数据
+    """
+
     entity = namedtuple("Adj", ["trade_date", "adj_score", "code"])
     headers = {
         "User-Agent": "Mozilla/4.0 (compatible; MSIE7.0; WindowsNT5.1; Maxthon2.0)"
     }
+    retry_num = 3
 
     def get_by_code(self, code: str) -> list:
+        data = []
+        for i in range(self.retry_num):
+            try:
+                data = self._get_by_code(code)
+                break
+            except requests.exceptions.ProxyError:
+                traceback.print_exc()
+        return data
+
+    def _get_by_code(self, code: str) -> list:
         note_patten = re.compile("\/\*(.*)+\*\/")
         data = []
         new_code = ("sh" if code.startswith("6") else "sz") + code
         url = f"http://finance.sina.com.cn/realstock/company/{new_code}/qianfuquan.js"
         try:
-            r = requests.get(url, headers=self.headers, timeout=15)
+            r = requests.get(url, headers=self.headers, timeout=15, proxies=proxies)
             r.encoding = "gbk"
             text = note_patten.sub("", r.text).strip()
             text = re.sub("\[{total:\d+,data:", "", text)
@@ -47,10 +69,16 @@ class AdjData(object):
 
 
 class FinanceData(object):
+    """
+    获取财务信息
+    """
 
     def __init__(self):
         bs.login()
         self.bs = bs
+
+    def __del__(self):
+        bs.logout()
 
     def get_by_code_and_quarter(self, code: str, year: int, quarter: int) -> dict:
         data = {}
@@ -73,16 +101,46 @@ class FinanceData(object):
 
 
 class HolderData(object):
+    """
+    获取股东信息
+    """
+
     entity = namedtuple("Holder", ["code", "publish_date", "holder", "ratio", "trend"])
     headers = {
         "User-Agent": "Mozilla/4.0 (compatible; MSIE7.0; WindowsNT5.1; Maxthon2.0)"
     }
+    retry_num = 3
 
     def get_by_code(self, code: str) -> list:
+        data = []
+        for i in range(self.retry_num):
+            try:
+                data = self._get_by_code(code)
+                break
+            except requests.exceptions.ProxyError:
+                traceback.print_exc()
+        return data
+
+    @staticmethod
+    def _parse_ratio(ratio: str) -> float:
+        _ratio = ratio.rstrip("↓↑")
+        _v = -1
+        try:
+            _v = float(_ratio) if _ratio else 0
+        except ValueError:
+            traceback.print_exc()
+        return _v
+
+    @staticmethod
+    def _parse_trend(ratio: str) -> int:
+        _v = 1 if str(ratio).endswith("↑") else (-1 if str(ratio).endswith("↓") else 0)
+        return _v
+
+    def _get_by_code(self, code: str) -> list:
         url = f"http://vip.stock.finance.sina.com.cn/corp/go.php/vCI_StockHolder/stockid/{code}.phtml"
         result = []
         try:
-            r = requests.get(url, headers=self.headers, timeout=15)
+            r = requests.get(url, headers=self.headers, timeout=15, proxies=proxies)
             r.encoding = "gbk"
             soup = BeautifulSoup(r.text, "html.parser")
             table = soup.select("table[id=Table1]")
@@ -117,19 +175,26 @@ class HolderData(object):
                         publish_date=datetime.datetime.strftime(
                             datetime.datetime.strptime(trade_date.replace("-", ""), "%Y%m%d"), "%Y-%m-%d"),
                         holder=holder,
-                        ratio=float(ratio.rstrip("↓↑")),
-                        trend=1 if str(ratio).endswith("↑") else (-1 if str(ratio).endswith("↓") else 0))
+                        ratio=self._parse_ratio(ratio),
+                        trend=self._parse_trend(ratio))
             for trade_date, holder, ratio in result]
         return result
 
 
 class MarketData(object):
+    """
+    获取交易数据
+    """
 
     def __init__(self):
         bs.login()
         self.bs = bs
 
-    def get_by_code_and_date(self, code: str, start_date: str, end_date: str) -> pd.DataFrame:
+    def __del__(self):
+        bs.logout()
+
+    def get_by_code_and_date(self, code: str, start_date: str, end_date: str) -> List[dict]:
+        data = []
         new_code = ("sh." if code.startswith("6") else "sz.") + code
         rs = self.bs.query_history_k_data_plus(
             new_code,
@@ -140,25 +205,49 @@ class MarketData(object):
             df: pd.DataFrame = rs.get_data()
             if df is not None and len(df) > 0:
                 df["code"] = df.code.apply(lambda x: x.lstrip("zsh."))
-            return df
-        else:
-            return pd.DataFrame([])
+            data = df.to_dict(orient="record")
+        return data
 
 
 class SecretaryData(object):
-    entity = namedtuple("Secretary", ["time", "total", "pages", "codeName", "code", "data"])
+    """
+    获取董秘发言
+    """
+
+    entity = namedtuple("Secretary",
+                        ["estockQuestion", "estockAnswer", "url", "stockCode", "stockMarket", "cTime", "qTime",
+                         "questioner", "answerer", "stockName", "crawlFromURL", "source"])
     headers = {
         "User-Agent": "Mozilla/4.0 (compatible; MSIE7.0; WindowsNT5.1; Maxthon2.0)"
     }
+    retry_num = 3
 
-    def get_by_code(self, code: str = None, page: int = 1, num: int = 50) -> dict:
+    def get_by_code(self, code: str = None, page: int = 1, num: int = 20) -> dict:
+        data = []
+        for i in range(self.retry_num):
+            try:
+                data = self._get_by_code(code, page, num)
+                break
+            except requests.exceptions.ProxyError:
+                traceback.print_exc()
+        return data
+
+    def _get_by_code(self, code: str = None, page: int = 1, num: int = 20) -> dict:
         code = "sh" + code if code.startswith("600") else "sz" + code
         url = f"https://interface.sina.cn/finance/column/stock/dongmiqa.d.json?stock={code}&page={page}&num={num}"
-        r = requests.get(url, headers=self.headers)
-        return r.json()
+        r = requests.get(url, headers=self.headers, proxies=proxies)
+        data = r.json()
+        return {
+            "total": data["total"],
+            "pages": data["pages"],
+            "data": [self.entity(**row) for row in data["data"]]
+        }
 
 
 class HolderNumData(object):
+    """
+    获取股东人数
+    """
     entity = namedtuple("HolderNum", ["code", "publish_date", "num", "value"])
     headers = {
         "User-Agent": "Mozilla/4.0 (compatible; MSIE7.0; WindowsNT5.1; Maxthon2.0)"
@@ -214,7 +303,7 @@ class HolderNumData(object):
             self.stop()
             self.start()
         self.n += 1
-        new_code = "sh" + code if code.startswith("60") else "sz" + code
+        new_code = ("sh" if code.startswith("6") else "sz") + code
         url = f"http://f10.eastmoney.com/f10_v2/ShareholderResearch.aspx?code={new_code}"
         self.browser.get(url)
         key_list = []
@@ -238,4 +327,6 @@ class HolderNumData(object):
 
 
 if __name__ == '__main__':
-    print(HolderNumData().get_by_code("603017"))
+    s = MarketData().get_by_code_and_date("600330", "2021-01-01","2021-01-21")
+    print(s)
+

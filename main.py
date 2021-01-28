@@ -18,14 +18,27 @@ if __name__ == '__main__':
     parser.add_argument("--quarter", type=int, default=None)
     parser.add_argument("--page", type=int, default=None)
     parser.add_argument("--num", type=int, default=50)
+    parser.add_argument("--reset", type=bool, default=False)
     args = parser.parse_args()
     op = args.op
     code = args.code
     start = args.start
     end = args.end
+    date = args.date
+    reset = args.reset
     if args.date:
         start = end = args.date
     if op == "holder_num":
-        FlushDataTask.flush_holder_num_task(end)
+        FlushDataTask.flush_holder_num_task(date)
+    elif op == "adj":
+        FlushDataTask.flush_adj_task(date)
+    elif op == "finance":
+        FlushDataTask.flush_finance_task(date)
+    elif op == "holder":
+        FlushDataTask.flush_holder_task(date)
+    elif op == "market":
+        FlushDataTask.flush_market_task(start, end)
+    elif op == "qa":
+        FlushDataTask.flush_secretary_task(date, reset)
     else:
         print("args wrong.")
