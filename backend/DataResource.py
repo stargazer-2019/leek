@@ -9,8 +9,9 @@ import requests
 
 import baostock as bs
 import pandas as pd
+import urllib3
 from bs4 import BeautifulSoup
-from selenium.common.exceptions import WebDriverException
+from selenium.common.exceptions import WebDriverException, NoSuchElementException
 from selenium.webdriver.phantomjs.webdriver import WebDriver
 from selenium.webdriver.phantomjs import webdriver
 
@@ -299,7 +300,7 @@ class HolderNumData(object):
         return _v
 
     def _get_by_code(self, code: str) -> list:
-        if self.n >= 2:
+        if self.n >= 5:
             self.stop()
             self.start()
         self.n += 1
@@ -326,7 +327,100 @@ class HolderNumData(object):
         return result
 
 
-if __name__ == '__main__':
-    s = MarketData().get_by_code_and_date("600330", "2021-01-01","2021-01-21")
-    print(s)
+class PbcData(object):
+    """
+    获取央行公告
+    """
+    entity = namedtuple("Pbc", ["title", "date", "url", "days", "amount", "rate", "content"])
+    headers = {
+        "User-Agent": "Mozilla/4.0 (compatible; MSIE7.0; WindowsNT5.1; Maxthon2.0)"
+    }
+    browser: WebDriver = None
+    n = 0
+    retry_num = 3
 
+    def __init__(self):
+        self.start()
+
+    def start(self):
+        self.browser = webdriver.WebDriver()
+
+    def stop(self):
+        if self.browser is not None:
+            self.browser.close()
+            self.browser.quit()
+        self.n = 0
+
+    def __del__(self):
+        self.stop()
+
+    def get_by_page(self, page: int = 1):
+        entity_list = []
+        for i in range(self.retry_num):
+            try:
+                entity_list = self._get_list_by_page(page)
+                break
+            except WebDriverException:
+                traceback.print_exc()
+        for k in range(len(entity_list)):
+            for i in range(self.retry_num):
+                try:
+                    entity_list[k] = self._get_by_entity(entity_list[k])
+                    break
+                except WebDriverException:
+                    traceback.print_exc()
+        return entity_list
+
+    def _get_list_by_page(self, page: int) -> List[namedtuple]:
+        if self.n >= 5:
+            self.stop()
+            self.start()
+        self.n += 1
+        result = []
+        url = f"http://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125475/17081/index{page}.html"
+        try:
+            self.browser.get(url)
+            tables = self.browser.find_elements_by_xpath("//div[@class='portlet']//table//table")
+            for table in tables:
+                link = table.find_element_by_tag_name("a")
+                span = table.find_element_by_tag_name("span")
+                result.append(self.entity(title=link.text,
+                                          date=span.text,
+                                          url=link.get_attribute("href"),
+                                          days="0",
+                                          amount="0",
+                                          rate="0",
+                                          content=""))
+        except (urllib3.exceptions.MaxRetryError, NoSuchElementException):
+            traceback.print_exc()
+        return result
+
+    def _get_by_entity(self, entity: namedtuple) -> namedtuple:
+        if self.n >= 5:
+            self.stop()
+            self.start()
+        self.n += 1
+        # noinspection PyProtectedMember
+        result = entity._asdict()
+        self.browser.get(entity.url)
+        table = self.browser.find_element_by_xpath("//div[@class='portlet']//table[@align='center'][2]")
+        if table:
+            result["content"] = table.text
+            if '不开展' not in table.text:
+                span_tag = table.find_elements_by_xpath("//table[@border>'0']//tr[1]//td")
+                data_tag = table.find_elements_by_xpath("//table[@border>'0']//tr[2]//td")
+                span = [tag.text for tag in span_tag]
+                data = [tag.text for tag in data_tag]
+                try:
+                    result["days"] = data[["期限" in w for w in span].index(True)]
+                    result["amount"] = data[["量" in w for w in span].index(True)]
+                    result["rate"] = data[["利率" in w for w in span].index(True)]
+                except ValueError:
+                    pass
+        return self.entity(**result)
+
+
+if __name__ == '__main__':
+    cls = PbcData()
+    for m in cls.get_by_page(1):
+        print(m)

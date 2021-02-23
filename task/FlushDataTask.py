@@ -4,9 +4,9 @@ from mongoengine import connect, disconnect
 from pymongo import UpdateOne
 from tqdm import tqdm
 
-from backend.DataResource import HolderNumData, HolderData, AdjData, FinanceData, SecretaryData, MarketData
+from backend.DataResource import HolderNumData, HolderData, AdjData, FinanceData, SecretaryData, MarketData, PbcData
 from domain.Documents import HolderNumDocument, ShareDocument, HolderDocument, AdjDocument, FinanceDocument, \
-    SecretaryDocument, MarketDocument
+    SecretaryDocument, MarketDocument, PbcDocument
 
 yesterday = (datetime.datetime.now() + datetime.timedelta(days=-1)).strftime("%Y-%m-%d")
 today = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -236,5 +236,29 @@ def flush_market_task(start_date: str = None, end_date: str = None):
     disconnect()
 
 
+def flush_pbc_task(page: int = 1):
+    """
+    刷新央行公告
+    :param page:
+    :return:
+    """
+    job = PbcData()
+    connect('jiucai', host='master:17585')
+    data = job.get_by_page(page)
+    if data:
+        # noinspection PyProtectedMember
+        bulk = [UpdateOne(
+            {
+                "url": row.url,
+            },
+            {
+                "$set": row._asdict()
+            },
+            upsert=True
+        ) for row in data]
+        # noinspection PyProtectedMember
+        PbcDocument._get_collection().bulk_write(bulk, ordered=False)
+
+
 if __name__ == '__main__':
-    flush_market_task()
+    flush_pbc_task()
