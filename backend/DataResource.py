@@ -224,7 +224,7 @@ class SecretaryData(object):
     retry_num = 3
 
     def get_by_code(self, code: str = None, page: int = 1, num: int = 20) -> dict:
-        data = []
+        data = {}
         for i in range(self.retry_num):
             try:
                 data = self._get_by_code(code, page, num)

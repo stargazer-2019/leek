@@ -176,6 +176,8 @@ def flush_secretary_task(last_date: str = None, only_one=True):
     for code in bar:
         data = []
         data_dict = job.get_by_code(code)
+        if not data_dict:
+            continue
         pages = data_dict["pages"]
         if data_dict["data"]:
             data.extend(data_dict["data"])
